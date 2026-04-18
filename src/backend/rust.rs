@@ -38,7 +38,9 @@ fn ty_str(to: PrimitiveType) -> &'static str {
     }
 }
 
-pub fn process(input: File<'_>) {
+pub fn process_server(input: File<'_>) -> String {
+    let mut buf = String::new();
+
     for interface in input.content {
         let TopLevelStatement::Interface(interface) = interface;
 
@@ -261,18 +263,20 @@ pub fn process(input: File<'_>) {
         buf_dispatch_impl += "}";
         buf_main += "}";
 
-        println!("{buf_dispatch}");
-        println!("{buf_dispatch_impl}");
-        println!("{buf_main}");
-        println!("impl std::os::popcorn::proto::Protocol for dyn {interface_ident} {{ const UID: u128 = {}; type Ctor = {interface_ident}Ctor; }}", interface.uid);
+        writeln!(&mut buf, "{buf_dispatch}");
+        writeln!(&mut buf, "{buf_dispatch_impl}");
+        writeln!(&mut buf, "{buf_main}");
+        writeln!(&mut buf, "impl std::os::popcorn::proto::Protocol for dyn {interface_ident} {{ const UID: u128 = {}; type Ctor = {interface_ident}Ctor; }}", interface.uid);
 
-        println!("#[repr(C)] pub struct {interface_ident}Ctor {{");
+        writeln!(&mut buf, "#[repr(C)] pub struct {interface_ident}Ctor {{");
         for (name, ty) in interface.ctor.args {
             let _ = match ty {
-                Type::Primitive(ty) => println!("pub {name}: {},", ty_str(ty)),
+                Type::Primitive(ty) => writeln!(&mut buf, "pub {name}: {},", ty_str(ty)),
                 _ => unreachable!(),
             };
         }
-        println!("}}");
+        writeln!(&mut buf, "}}");
     }
+
+    buf
 }

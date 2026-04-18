@@ -8,7 +8,7 @@ use color_print::{ceprint, ceprintln};
 use derive_more::{Display, Error};
 use std::fmt::Write;
 use std::fmt::{Display, Formatter};
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use clap::ValueEnum;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -73,33 +73,27 @@ impl ValueEnum for OutputTy {
     }
 }
 
-pub fn process_file(file_path: &str, format: OutputFormat, output: &PathBuf) -> anyhow::Result<()> {
-    ceprintln!("       <g><em>Parsing</em></g> {file_path}");
+pub fn process_file(file_path: &Path, format: OutputFormat, ty: OutputTy, output: &PathBuf) -> anyhow::Result<()> {
+    ceprintln!("       <g><em>Parsing</em></g> {}", file_path.display());
 
     let file_data = std::fs::read_to_string(file_path).context("failed to open file")?;
 
     let mut ctx = ParseContext::new(&file_data, file_path);
     let file = File::parse(&mut ctx).context("failed to parse file")?;
-    ceprintln!("        <g><em>Parsed</em></g> {file_path}");
+    ceprintln!("        <g><em>Parsed</em></g> {}", file_path.display());
 
-    backend::rust::process(file);
-    Ok(())
+    let out = match (format, ty) {
+        (OutputFormat::Rust, OutputTy::Server) => backend::rust::process_server(file),
+        _ => todo!(),
+    };
 
-    //generate_output(file, format, output)
-}
-
-fn generate_output(file: File, format: OutputFormat, output: &PathBuf) -> anyhow::Result<()> {
     let extension = format.to_file_extension();
-    for statement in file.content {
-        match statement {
-            TopLevelStatement::Interface(interface) => {
-                let file_path = PathBuf::clone(output)
-                    .join(interface.ident)
-                    .with_added_extension(extension);
-                ceprintln!("    <g><em>Generating</em></g> {}", file_path.display());
-            }
-        }
-    }
+    let file_path = PathBuf::clone(output)
+        .join(file_path.file_stem().context("invalid filename")?)
+        .with_added_extension(extension);
+    ceprintln!("    <g><em>Generating</em></g> {}", file_path.display());
+
+    std::fs::write(file_path, out).context("failed to write file")?;
 
     Ok(())
 }
@@ -117,7 +111,7 @@ enum CommentTy {
 }
 
 impl<'tokens> ParseContext<'tokens> {
-    fn new(tokens: &'tokens str, filename: &'tokens str) -> ParseContext<'tokens> {
+    fn new(tokens: &'tokens str, filename: &'tokens Path) -> ParseContext<'tokens> {
         let mut vec = vec![];
 
         let mut token_start = None;
@@ -316,7 +310,7 @@ struct Token<'a> {
 
 #[derive(Debug, Copy, Clone)]
 struct Span<'a> {
-    file: &'a str,
+    file: &'a Path,
     span_start: (usize, usize),
     source: &'a str,
 }
@@ -326,7 +320,7 @@ impl Display for Span<'_> {
         write!(
             f,
             "{}:{}:{}",
-            self.file,
+            self.file.display(),
             self.span_start.0,
             self.span_start.1 + 1
         )
