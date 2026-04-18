@@ -1,0 +1,11 @@
+[package]
+name = "pipc"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.98"
+clap = { version = "4.5.39", features = ["cargo"] }
+color-print = "0.3.7"
+derive_more = { version = "2.0.1", features = ["display", "error"] }
+heck = "0.5.0"
